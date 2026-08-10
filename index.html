@@ -1,360 +1,240 @@
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Dashboard Interativo - Mini Estufa ESP32</title>
-  
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <!-- Biblioteca MQTT para conexão via WebSockets -->
-  <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+#include <Wire.h>
+#include <DHT.h>
+#include <LiquidCrystal_I2C.h>
+#include <WiFi.h>
+#include <WiFiClientSecure.h>
+#include <HTTPClient.h>
+#include <ArduinoJson.h>
+#include <PubSubClient.h>
 
-  <style>
-    :root {
-      --bg-primary: #0f172a;
-      --bg-card: #1e293b;
-      --text-main: #f8fafc;
-      --text-muted: #94a3b8;
-      --accent-green: #10b981;
-      --accent-blue: #06b6d4;
-      --accent-yellow: #f59e0b;
-      --accent-red: #ef4444;
-      --border-color: #334155;
+// PINOS ESP32-S3
+#define DHT_PIN          15
+#define DHTTYPE          DHT22
+#define LDR_PIN          4
+#define POT_PIN          5
+#define LED_IRRIGA_PIN   18
+#define BUZZER_PIN       19
+#define SDA_PIN          21
+#define SCL_PIN          17
+
+DHT dht(DHT_PIN, DHTTYPE);
+LiquidCrystal_I2C lcd(0x27, 16, 2);
+
+const char* ssid = "Wokwi-GUEST";
+const char* password = "";
+const char* mqtt_server = "broker.hivemq.com";
+
+WiFiClient espMqttClient;
+PubSubClient clientMQTT(espMqttClient);
+
+const char* TELEGRAM_TOKEN   = "8675430274:AAHI4KF7EOQPyIQfqzSMipgaZQVZz6YfTuM";
+const char* TELEGRAM_CHAT_ID = "8801014782";
+
+const float UMIDADE_MOFO_LIMITE = 85.0;
+const float TEMP_ALERTA_LIMITE  = 30.0;
+
+bool alertaMofoAtivo = false;
+bool alertaTempAtivo = false;
+
+// VARIÁVEIS GLOBAIS (Atualizadas via Site ou Wokwi)
+float g_temp = 25.0, g_umid = 60.0;
+int   g_luz = 80, g_agua = 75;
+bool  g_irrigando = false;
+
+long lastUpdateId = 0;
+unsigned long ultimoPollingTelegram = 0;
+
+// Callback: Recebe mensagens do site
+void mqttCallback(char* topic, byte* payload, unsigned int length) {
+  String msg;
+  for (unsigned int i = 0; i < length; i++) msg += (char)payload[i];
+
+  DynamicJsonDocument doc(512);
+  DeserializationError err = deserializeJson(doc, msg);
+  if (!err) {
+    g_temp = doc["temp"] | g_temp;
+    g_umid = doc["umid"] | g_umid;
+    g_luz  = doc["luz"]  | g_luz;
+    g_agua = doc["agua"] | g_agua;
+    g_irrigando = doc["bomba"] | false;
+  }
+}
+
+void reconectarMQTT() {
+  if (!clientMQTT.connected()) {
+    String clientId = "ESP32EstufaClient-" + String(random(0xffff), HEX);
+    if (clientMQTT.connect(clientId.c_str())) {
+      clientMQTT.subscribe("estufa/senai/comando_sliders");
     }
+  }
+}
 
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-      font-family: 'Inter', sans-serif;
-    }
+void setup() {
+  Serial.begin(115200);
+  delay(1000);
 
-    body {
-      background-color: var(--bg-primary);
-      color: var(--text-main);
-      min-height: 100vh;
-      padding: 20px;
-    }
+  Wire.begin(SDA_PIN, SCL_PIN);
+  lcd.init();
+  lcd.backlight();
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print(" Estufa SENAI ");
+  lcd.setCursor(0, 1);
+  lcd.print("Iniciando...");
 
-    header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      max-width: 1200px;
-      margin: 0 auto 20px auto;
-      padding-bottom: 15px;
-      border-bottom: 1px solid var(--border-color);
-    }
+  dht.begin();
+  pinMode(LED_IRRIGA_PIN, OUTPUT);
+  pinMode(BUZZER_PIN, OUTPUT);
 
-    .logo-area h1 {
-      font-size: 1.4rem;
-      font-weight: 700;
-      color: var(--accent-green);
-    }
+  WiFi.mode(WIFI_STA);
+  WiFi.begin(ssid, password);
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(200);
+  }
 
-    .status-connection {
-      font-size: 0.85rem;
-      padding: 6px 12px;
-      border-radius: 20px;
-      background: rgba(255,255,255,0.05);
-      border: 1px solid var(--border-color);
-    }
+  clientMQTT.setServer(mqtt_server, 1883);
+  clientMQTT.setCallback(mqttCallback);
 
-    .dashboard-grid {
-      display: grid;
-      grid-template-columns: repeat(12, 1fr);
-      gap: 20px;
-      max-width: 1200px;
-      margin: 0 auto;
-    }
+  lcd.clear();
+  lcd.print("WiFi & MQTT Ok!");
+  delay(1000);
+}
 
-    .card {
-      background-color: var(--bg-card);
-      border: 1px solid var(--border-color);
-      border-radius: 12px;
-      padding: 20px;
-    }
+void loop() {
+  if (!clientMQTT.connected()) {
+    reconectarMQTT();
+  }
+  clientMQTT.loop();
 
-    .card-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 12px;
-    }
+  // Verifica lógica dos atuadores com os dados recebidos do site
+  bool riscoDeMofo = (g_umid > UMIDADE_MOFO_LIMITE);
 
-    .card-title {
-      font-size: 0.85rem;
-      color: var(--text-muted);
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-    }
+  digitalWrite(LED_IRRIGA_PIN, (g_irrigando && !riscoDeMofo) ? HIGH : LOW);
+  digitalWrite(BUZZER_PIN, g_temp > TEMP_ALERTA_LIMITE ? HIGH : LOW);
 
-    .card-value {
-      font-size: 2rem;
-      font-weight: 700;
-    }
+  // Alertas Telegram
+  if (riscoDeMofo && !alertaMofoAtivo) {
+    alertaMofoAtivo = true;
+    enviarTelegram("🍄 ALERTA MOFO: Umidade em " + String(g_umid, 0) + "%. Irrigação suspensa.");
+  } else if (!riscoDeMofo && alertaMofoAtivo) {
+    alertaMofoAtivo = false;
+  }
 
-    .col-3 { grid-column: span 3; }
-    .col-6 { grid-column: span 6; }
-    .col-12 { grid-column: span 12; }
+  if (g_temp > TEMP_ALERTA_LIMITE && !alertaTempAtivo) {
+    alertaTempAtivo = true;
+    enviarTelegram("🌡️ ALERTA TEMPERATURA: " + String(g_temp, 1) + "°C.");
+  } else if (g_temp <= TEMP_ALERTA_LIMITE && alertaTempAtivo) {
+    alertaTempAtivo = false;
+  }
 
-    .simulator-card {
-      background-color: #1a2332;
-      border: 1px solid var(--accent-blue);
-      box-shadow: 0 0 15px rgba(6, 182, 212, 0.15);
-    }
+  // Atualização LCD no Wokwi
+  lcd.setCursor(0, 0);
+  lcd.print("T:" + String(g_temp, 1) + "C U:" + String(g_umid, 0) + "%   ");
+  lcd.setCursor(0, 1);
+  if (riscoDeMofo) {
+    lcd.print("MOFO! Irrig OFF ");
+  } else {
+    lcd.print("L:" + String(g_luz) + "% Agua:" + String(g_agua) + "%    ");
+  }
 
-    .controls-grid {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-top: 10px;
-    }
+  // Polling Telegram a cada 3s
+  if (millis() - ultimoPollingTelegram > 3000) {
+    ultimoPollingTelegram = millis();
+    verificarComandosTelegram();
+  }
 
-    .btn-toggle {
-      background-color: var(--border-color);
-      color: var(--text-main);
-      border: none;
-      padding: 10px 20px;
-      border-radius: 8px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.2s ease;
-    }
+  delay(200);
+}
 
-    .btn-toggle.active {
-      background-color: var(--accent-blue);
-      color: #000;
-      box-shadow: 0 0 10px rgba(6, 182, 212, 0.5);
-    }
+// ================= TELEGRAM =================
 
-    .badge-status {
-      display: inline-block;
-      padding: 4px 10px;
-      border-radius: 6px;
-      font-size: 0.8rem;
-      font-weight: 700;
-      margin-top: 10px;
-    }
+void verificarComandosTelegram() {
+  if (WiFi.status() != WL_CONNECTED) return;
+  WiFiClientSecure secureClient;
+  secureClient.setInsecure();
+  HTTPClient https;
 
-    .badge-off { background-color: rgba(148, 163, 184, 0.2); color: var(--text-muted); }
-    .badge-on { background-color: rgba(6, 182, 212, 0.2); color: var(--accent-blue); }
+  String url = "https://api.telegram.org/bot" + String(TELEGRAM_TOKEN) +
+               "/getUpdates?offset=" + String(lastUpdateId + 1) + "&timeout=0";
 
-    .water-bar-bg {
-      width: 100%;
-      height: 10px;
-      background-color: var(--bg-primary);
-      border-radius: 6px;
-      overflow: hidden;
-      margin-top: 15px;
-    }
+  if (!https.begin(secureClient, url)) return;
 
-    .water-bar-fill {
-      height: 100%;
-      width: 0%;
-      background: linear-gradient(90deg, #3b82f6, var(--accent-blue));
-      transition: width 0.3s ease;
-    }
+  int httpCode = https.GET();
+  if (httpCode == 200) {
+    String payload = https.getString();
+    DynamicJsonDocument doc(4096);
+    if (!deserializeJson(doc, payload)) {
+      JsonArray results = doc["result"].as<JsonArray>();
+      for (JsonObject update : results) {
+        long updateId = update["update_id"];
+        if (updateId > lastUpdateId) lastUpdateId = updateId;
 
-    @media (max-width: 900px) {
-      .col-3, .col-6 { grid-column: span 12; }
-    }
-  </style>
-</head>
-<body>
+        String texto = update["message"]["text"].as<String>();
+        String chatId = String((long)update["message"]["chat"]["id"]);
+        texto.trim();
 
-  <header>
-    <div class="logo-area">
-      <h1>🌱 Estufa de Monitoramento <span style="font-size: 0.8rem; color: var(--text-muted);">(Conectado ao Wokwi)</span></h1>
-    </div>
-    <div class="status-connection" id="mqtt-status">📡 Conectando ao Wokwi...</div>
-  </header>
-
-  <main class="dashboard-grid">
-
-    <!-- PAINEL DE COMANDO -->
-    <div class="card col-12 simulator-card">
-      <div class="card-header">
-        <span class="card-title" style="color: var(--accent-blue);">🎛️ Controle da Irrigação em Tempo Real</span>
-        <span style="font-size: 0.8rem; color: var(--text-muted);">Envie comandos diretamente para o circuito no Wokwi</span>
-      </div>
-      <div class="controls-grid">
-        <p>Acionamento manual da bomba/LED no Wokwi:</p>
-        <button class="btn-toggle" id="btn-irrigacao" onclick="toggleIrrigacao()">LIGAR BOMBA</button>
-      </div>
-    </div>
-
-    <!-- CARDS DE MONITORAMENTO -->
-    <div class="card col-3">
-      <div class="card-header">
-        <span class="card-title">Irrigação</span>
-        <span>💧</span>
-      </div>
-      <div class="card-value" id="irrigacao-texto">DESLIGADO</div>
-      <div id="irrigacao-badge" class="badge-status badge-off">Bomba Inativa</div>
-    </div>
-
-    <div class="card col-3">
-      <div class="card-header">
-        <span class="card-title">Nível da Água</span>
-        <span>🪣</span>
-      </div>
-      <div class="card-value" id="nivel-agua-val">--%</div>
-      <div class="water-bar-bg">
-        <div class="water-bar-fill" id="water-bar" style="width: 0%;"></div>
-      </div>
-    </div>
-
-    <div class="card col-3">
-      <div class="card-header">
-        <span class="card-title">Temperatura</span>
-        <span>🌡️</span>
-      </div>
-      <div class="card-value" id="temp-val" style="color: var(--accent-yellow);">-- °C</div>
-    </div>
-
-    <div class="card col-3">
-      <div class="card-header">
-        <span class="card-title">Umidade do Ar</span>
-        <span>💨</span>
-      </div>
-      <div class="card-value" id="umid-val" style="color: var(--accent-blue);">-- %</div>
-    </div>
-
-    <!-- GRÁFICOS -->
-    <div class="card col-6">
-      <div class="card-header">
-        <span class="card-title">Gráfico de Temperatura e Umidade</span>
-      </div>
-      <canvas id="chartTempUmid"></canvas>
-    </div>
-
-    <div class="card col-6">
-      <div class="card-header">
-        <span class="card-title">Histórico de Luminosidade (LDR)</span>
-      </div>
-      <canvas id="chartLuminosidade"></canvas>
-    </div>
-
-  </main>
-
-  <script>
-    // GRÁFICOS INITIALIZATION
-    const ctxTempUmid = document.getElementById('chartTempUmid').getContext('2d');
-    const chartTempUmid = new Chart(ctxTempUmid, {
-      type: 'line',
-      data: {
-        labels: [],
-        datasets: [
-          { label: 'Temperatura (°C)', data: [], borderColor: '#f59e0b', backgroundColor: 'rgba(245, 158, 11, 0.1)', tension: 0.3, fill: true },
-          { label: 'Umidade (%)', data: [], borderColor: '#06b6d4', backgroundColor: 'rgba(6, 182, 212, 0.1)', tension: 0.3, fill: true }
-        ]
-      },
-      options: {
-        responsive: true,
-        plugins: { legend: { labels: { color: '#f8fafc' } } },
-        scales: {
-          x: { ticks: { color: '#94a3b8' }, grid: { color: '#334155' } },
-          y: { ticks: { color: '#94a3b8' }, grid: { color: '#334155' } }
+        if (texto == "/relatorio" || texto == "/status") {
+          enviarRelatorio(chatId);
+        } else if (texto == "/start") {
+          enviarTelegramPara(chatId, "🌱 Bot da Estufa SENAI ativo!\n/relatorio - dados em tempo real");
         }
       }
-    });
-
-    const ctxLuminosidade = document.getElementById('chartLuminosidade').getContext('2d');
-    const chartLuminosidade = new Chart(ctxLuminosidade, {
-      type: 'line',
-      data: {
-        labels: [],
-        datasets: [{ label: 'Luminosidade (%)', data: [], borderColor: '#10b981', backgroundColor: 'rgba(16, 185, 129, 0.15)', tension: 0.3, fill: true }]
-      },
-      options: {
-        responsive: true,
-        plugins: { legend: { labels: { color: '#f8fafc' } } },
-        scales: {
-          x: { ticks: { color: '#94a3b8' }, grid: { color: '#334155' } },
-          y: { ticks: { color: '#94a3b8' }, grid: { color: '#334155' } }
-        }
-      }
-    });
-
-    let bombaState = false;
-
-    // CONEXÃO MQTT VIA WEBSOCKETS (HiveMQ Público)
-    const mqttClient = mqtt.connect('wss://broker.hivemq.com:8884/mqtt');
-
-    mqttClient.on('connect', () => {
-      document.getElementById('mqtt-status').innerText = '🟢 Conectado ao Wokwi';
-      document.getElementById('mqtt-status').style.color = 'var(--accent-green)';
-      mqttClient.subscribe('estufa/senai/dados');
-    });
-
-    mqttClient.on('offline', () => {
-      document.getElementById('mqtt-status').innerText = '🔴 Desconectado';
-      document.getElementById('mqtt-status').style.color = 'var(--accent-red)';
-    });
-
-    mqttClient.on('message', (topic, message) => {
-      if (topic === 'estufa/senai/dados') {
-        const data = JSON.parse(message.toString());
-        atualizarDashboard(data);
-      }
-    });
-
-    function atualizarDashboard(data) {
-      document.getElementById('temp-val').innerText = `${data.temp.toFixed(1)} °C`;
-      document.getElementById('umid-val').innerText = `${data.umid.toFixed(0)} %`;
-      document.getElementById('nivel-agua-val').innerText = `${data.agua}%`;
-      document.getElementById('water-bar').style.width = `${data.agua}%`;
-
-      // Atualiza estado da bomba
-      bombaState = data.irrigando;
-      const btn = document.getElementById('btn-irrigacao');
-      const txt = document.getElementById('irrigacao-texto');
-      const badge = document.getElementById('irrigacao-badge');
-
-      if (bombaState) {
-        btn.innerText = 'DESLIGAR BOMBA';
-        btn.classList.add('active');
-        txt.innerText = 'LIGADO';
-        txt.style.color = 'var(--accent-blue)';
-        badge.innerText = 'Bomba em Operação';
-        badge.className = 'badge-status badge-on';
-      } else {
-        btn.innerText = 'LIGAR BOMBA';
-        btn.classList.remove('active');
-        txt.innerText = 'DESLIGADO';
-        txt.style.color = 'var(--text-main)';
-        badge.innerText = 'Bomba Inativa';
-        badge.className = 'badge-status badge-off';
-      }
-
-      // Adiciona ponto nos gráficos
-      const hora = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-      adicionarPontoGrafico(chartTempUmid, hora, [data.temp, data.umid]);
-      adicionarPontoGrafico(chartLuminosidade, hora, [data.luz]);
     }
+  }
+  https.end();
+}
 
-    function adicionarPontoGrafico(chart, label, dados) {
-      if (chart.data.labels.length > 10) {
-        chart.data.labels.shift();
-        chart.data.datasets.forEach(dataset => dataset.data.shift());
-      }
-      chart.data.labels.push(label);
-      chart.data.datasets.forEach((dataset, index) => {
-        dataset.data.push(dados[index]);
-      });
-      chart.update();
-    }
+void enviarRelatorio(String chatId) {
+  String status = g_irrigando ? "🟢 Irrigando" : "🔴 Parada";
+  String mofo = (g_umid > UMIDADE_MOFO_LIMITE) ? "⚠️ RISCO DE MOFO" : "✅ Normal";
 
-    function toggleIrrigacao() {
-      const novoComando = bombaState ? 'DESLIGAR_BOMBA' : 'LIGAR_BOMBA';
-      mqttClient.publish('estufa/senai/comando', novoComando);
+  String msg = "📊 *Relatório da Estufa*\n"
+               "🌡️ Temperatura: " + String(g_temp, 1) + "°C\n" +
+               "💧 Umidade do ar: " + String(g_umid, 0) + "%\n" +
+               "☀️ Luminosidade: " + String(g_luz) + "%\n" +
+               "🪣 Umidade do solo: " + String(g_agua) + "%\n" +
+               "🚿 Irrigação: " + status + "\n" +
+               "🍄 Condição: " + mofo;
+
+  enviarTelegramPara(chatId, msg);
+}
+
+void enviarTelegram(String mensagem) {
+  enviarTelegramPara(String(TELEGRAM_CHAT_ID), mensagem);
+}
+
+void enviarTelegramPara(String chatId, String mensagem) {
+  if (WiFi.status() != WL_CONNECTED) return;
+  WiFiClientSecure secureClient;
+  secureClient.setInsecure();
+  HTTPClient https;
+
+  String url = "https://api.telegram.org/bot" + String(TELEGRAM_TOKEN) +
+               "/sendMessage?chat_id=" + chatId + "&text=" + urlEncode(mensagem);
+
+  if (https.begin(secureClient, url)) {
+    https.GET();
+    https.end();
+  }
+}
+
+String urlEncode(String str) {
+  String encoded = "";
+  char c, code0, code1;
+  for (int i = 0; i < str.length(); i++) {
+    c = str.charAt(i);
+    if (isalnum(c)) {
+      encoded += c;
+    } else {
+      code1 = (c & 0xf) + '0';
+      if ((c & 0xf) > 9) code1 = (c & 0xf) - 10 + 'A';
+      c = (c >> 4) & 0xf;
+      code0 = c + '0';
+      if (c > 9) code0 = c - 10 + 'A';
+      encoded += '%';
+      encoded += code0;
+      encoded += code1;
     }
-  </script>
-</body>
-</html>
+  }
+  return encoded;
+}
