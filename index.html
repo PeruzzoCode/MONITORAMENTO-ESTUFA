@@ -25,19 +25,8 @@
       --border-color: #334155;
     }
 
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-      font-family: 'Inter', sans-serif;
-    }
-
-    body {
-      background-color: var(--bg-primary);
-      color: var(--text-main);
-      min-height: 100vh;
-      padding: 20px;
-    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', sans-serif; }
+    body { background-color: var(--bg-primary); color: var(--text-main); min-height: 100vh; padding: 20px; }
 
     header {
       display: flex;
@@ -49,140 +38,39 @@
       border-bottom: 1px solid var(--border-color);
     }
 
-    .logo-area h1 {
-      font-size: 1.4rem;
-      font-weight: 700;
-      color: var(--accent-green);
-    }
+    .logo-area h1 { font-size: 1.4rem; font-weight: 700; color: var(--accent-green); }
+    .status-connection { font-size: 0.85rem; padding: 6px 12px; border-radius: 20px; background: rgba(255,255,255,0.05); border: 1px solid var(--border-color); font-weight: 600; }
 
-    .status-connection {
-      font-size: 0.85rem;
-      padding: 6px 12px;
-      border-radius: 20px;
-      background: rgba(255,255,255,0.05);
-      border: 1px solid var(--border-color);
-      font-weight: 600;
-    }
-
-    .dashboard-grid {
-      display: grid;
-      grid-template-columns: repeat(12, 1fr);
-      gap: 20px;
-      max-width: 1200px;
-      margin: 0 auto;
-    }
-
-    .card {
-      background-color: var(--bg-card);
-      border: 1px solid var(--border-color);
-      border-radius: 12px;
-      padding: 20px;
-    }
-
-    .card-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 12px;
-    }
-
-    .card-title {
-      font-size: 0.85rem;
-      color: var(--text-muted);
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-    }
-
-    .card-value {
-      font-size: 2rem;
-      font-weight: 700;
-    }
+    .dashboard-grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 20px; max-width: 1200px; margin: 0 auto; }
+    .card { background-color: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; padding: 20px; }
+    .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+    .card-title { font-size: 0.85rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+    .card-value { font-size: 2rem; font-weight: 700; }
 
     .col-3 { grid-column: span 3; }
     .col-6 { grid-column: span 6; }
     .col-12 { grid-column: span 12; }
 
-    .simulator-card {
-      background-color: #1a2332;
-      border: 1px solid var(--accent-blue);
-      box-shadow: 0 0 15px rgba(6, 182, 212, 0.15);
-    }
-
-    .controls-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-      gap: 15px;
-      margin-top: 10px;
-    }
-
-    .control-group {
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-    }
-
-    .control-group label {
-      font-size: 0.85rem;
-      color: var(--text-muted);
-      display: flex;
-      justify-content: space-between;
-    }
-
-    input[type="range"] {
-      accent-color: var(--accent-blue);
-      cursor: pointer;
-    }
+    .simulator-card { background-color: #1a2332; border: 1px solid var(--accent-blue); box-shadow: 0 0 15px rgba(6, 182, 212, 0.15); }
+    .controls-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-top: 10px; }
+    .control-group { display: flex; flex-direction: column; gap: 6px; }
+    .control-group label { font-size: 0.85rem; color: var(--text-muted); display: flex; justify-content: space-between; }
+    input[type="range"] { accent-color: var(--accent-blue); cursor: pointer; }
 
     .btn-toggle {
-      background-color: var(--border-color);
-      color: var(--text-main);
-      border: none;
-      padding: 10px 15px;
-      border-radius: 8px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.2s ease;
-      margin-top: 5px;
+      background-color: var(--border-color); color: var(--text-main); border: none; padding: 10px 15px;
+      border-radius: 8px; font-weight: 600; cursor: pointer; transition: all 0.2s ease; margin-top: 5px;
     }
+    .btn-toggle.active { background-color: var(--accent-blue); color: #000; box-shadow: 0 0 10px rgba(6, 182, 212, 0.5); }
 
-    .btn-toggle.active {
-      background-color: var(--accent-blue);
-      color: #000;
-      box-shadow: 0 0 10px rgba(6, 182, 212, 0.5);
-    }
-
-    .badge-status {
-      display: inline-block;
-      padding: 4px 10px;
-      border-radius: 6px;
-      font-size: 0.8rem;
-      font-weight: 700;
-      margin-top: 10px;
-    }
-
+    .badge-status { display: inline-block; padding: 4px 10px; border-radius: 6px; font-size: 0.8rem; font-weight: 700; margin-top: 10px; }
     .badge-off { background-color: rgba(148, 163, 184, 0.2); color: var(--text-muted); }
     .badge-on { background-color: rgba(6, 182, 212, 0.2); color: var(--accent-blue); }
 
-    .water-bar-bg {
-      width: 100%;
-      height: 10px;
-      background-color: var(--bg-primary);
-      border-radius: 6px;
-      overflow: hidden;
-      margin-top: 15px;
-    }
+    .water-bar-bg { width: 100%; height: 10px; background-color: var(--bg-primary); border-radius: 6px; overflow: hidden; margin-top: 15px; }
+    .water-bar-fill { height: 100%; width: 50%; background: linear-gradient(90deg, #3b82f6, var(--accent-blue)); transition: width 0.3s ease; }
 
-    .water-bar-fill {
-      height: 100%;
-      width: 75%;
-      background: linear-gradient(90deg, #3b82f6, var(--accent-blue));
-      transition: width 0.3s ease;
-    }
-
-    @media (max-width: 900px) {
-      .col-3, .col-6 { grid-column: span 12; }
-    }
+    @media (max-width: 900px) { .col-3, .col-6 { grid-column: span 12; } }
   </style>
 </head>
 <body>
@@ -199,8 +87,8 @@
     <!-- PAINEL INTERATIVO DE CONTROLE -->
     <div class="card col-12 simulator-card">
       <div class="card-header">
-        <span class="card-title" style="color: var(--accent-blue);">🎛️ Painel de Controle Remoto do Circuito</span>
-        <span style="font-size: 0.8rem; color: var(--text-muted);">Mova os controles para alterar a simulação no Wokwi em tempo real</span>
+        <span class="card-title" style="color: var(--accent-blue);">🎛️ Painel de Controle Remoto / Sobrescrita</span>
+        <span style="font-size: 0.8rem; color: var(--text-muted);">Mova os controles abaixo para simular/sobrescrever leituras no Wokwi</span>
       </div>
       <div class="controls-grid">
         
@@ -220,12 +108,12 @@
         </div>
 
         <div class="control-group">
-          <label>Reservatório (Solo): <b id="lbl-agua">75 %</b></label>
-          <input type="range" id="input-agua" min="0" max="100" value="75" oninput="enviarComandosWeb()">
+          <label>Reservatório (Solo): <b id="lbl-agua">56 %</b></label>
+          <input type="range" id="input-agua" min="0" max="100" value="56" oninput="enviarComandosWeb()">
         </div>
 
         <div class="control-group">
-          <label>Atuador Bomba (LED / Transistor):</label>
+          <label>Atuador Bomba (LED):</label>
           <button class="btn-toggle" id="btn-irrigacao" onclick="toggleIrrigacao()">LIGAR BOMBA</button>
         </div>
 
@@ -247,9 +135,9 @@
         <span class="card-title">Nível da Água</span>
         <span>🪣</span>
       </div>
-      <div class="card-value" id="nivel-agua-val">75%</div>
+      <div class="card-value" id="nivel-agua-val">56%</div>
       <div class="water-bar-bg">
-        <div class="water-bar-fill" id="water-bar" style="width: 75%;"></div>
+        <div class="water-bar-fill" id="water-bar" style="width: 56%;"></div>
       </div>
     </div>
 
@@ -271,16 +159,12 @@
 
     <!-- GRÁFICOS -->
     <div class="card col-6">
-      <div class="card-header">
-        <span class="card-title">Gráfico de Temperatura e Umidade</span>
-      </div>
+      <div class="card-header"><span class="card-title">Gráfico de Temperatura e Umidade</span></div>
       <canvas id="chartTempUmid"></canvas>
     </div>
 
     <div class="card col-6">
-      <div class="card-header">
-        <span class="card-title">Histórico de Luminosidade (LDR)</span>
-      </div>
+      <div class="card-header"><span class="card-title">Histórico de Luminosidade (LDR)</span></div>
       <canvas id="chartLuminosidade"></canvas>
     </div>
 
@@ -325,6 +209,7 @@
     });
 
     let bombaLigada = false;
+    let usuarioInteragindo = false;
 
     const mqttClient = mqtt.connect('wss://broker.hivemq.com:8884/mqtt', {
       clientId: 'web_estufa_' + Math.random().toString(16).substr(2, 8)
@@ -333,7 +218,7 @@
     mqttClient.on('connect', () => {
       document.getElementById('mqtt-status').innerText = '🟢 Conectado ao Wokwi';
       document.getElementById('mqtt-status').style.color = 'var(--accent-green)';
-      enviarComandosWeb();
+      mqttClient.subscribe('estufa/senai/dados');
     });
 
     mqttClient.on('offline', () => {
@@ -341,16 +226,45 @@
       document.getElementById('mqtt-status').style.color = 'var(--accent-red)';
     });
 
-    const inTemp = document.getElementById('input-temp');
-    const inUmid = document.getElementById('input-umid');
-    const inLuz = document.getElementById('input-luz');
-    const inAgua = document.getElementById('input-agua');
+    mqttClient.on('message', (topic, message) => {
+      if (topic === 'estufa/senai/dados') {
+        const data = JSON.parse(message.toString());
+        
+        // Atualizar se o usuário não estiver mexendo nos sliders no exato segundo
+        if (!usuarioInteragindo) {
+          atualizarValoresTela(data.temp, data.umid, data.luz, data.agua, data.bomba);
+        }
+      }
+    });
+
+    function atualizarValoresTela(temp, umid, luz, agua, bomba) {
+      document.getElementById('temp-val').innerText = `${parseFloat(temp).toFixed(1)} °C`;
+      document.getElementById('umid-val').innerText = `${umid} %`;
+      document.getElementById('nivel-agua-val').innerText = `${agua}%`;
+      document.getElementById('water-bar').style.width = `${agua}%`;
+
+      document.getElementById('lbl-temp').innerText = `${parseFloat(temp).toFixed(1)} °C`;
+      document.getElementById('lbl-umid').innerText = `${umid} %`;
+      document.getElementById('lbl-luz').innerText = `${luz} %`;
+      document.getElementById('lbl-agua').innerText = `${agua} %`;
+
+      document.getElementById('input-temp').value = temp;
+      document.getElementById('input-umid').value = umid;
+      document.getElementById('input-luz').value = luz;
+      document.getElementById('input-agua').value = agua;
+
+      const hora = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      adicionarPontoGrafico(chartTempUmid, hora, [temp, umid]);
+      adicionarPontoGrafico(chartLuminosidade, hora, [luz]);
+    }
 
     function enviarComandosWeb() {
-      const vTemp = parseFloat(inTemp.value).toFixed(1);
-      const vUmid = parseInt(inUmid.value);
-      const vLuz = parseInt(inLuz.value);
-      const vAgua = parseInt(inAgua.value);
+      usuarioInteragindo = true;
+      
+      const vTemp = parseFloat(document.getElementById('input-temp').value).toFixed(1);
+      const vUmid = parseInt(document.getElementById('input-umid').value);
+      const vLuz = parseInt(document.getElementById('input-luz').value);
+      const vAgua = parseInt(document.getElementById('input-agua').value);
 
       document.getElementById('lbl-temp').innerText = `${vTemp} °C`;
       document.getElementById('lbl-umid').innerText = `${vUmid} %`;
@@ -362,10 +276,6 @@
       document.getElementById('nivel-agua-val').innerText = `${vAgua}%`;
       document.getElementById('water-bar').style.width = `${vAgua}%`;
 
-      const hora = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-      adicionarPontoGrafico(chartTempUmid, hora, [vTemp, vUmid]);
-      adicionarPontoGrafico(chartLuminosidade, hora, [vLuz]);
-
       const payload = JSON.stringify({
         temp: parseFloat(vTemp),
         umid: vUmid,
@@ -375,8 +285,10 @@
       });
 
       if (mqttClient.connected) {
-        mqttClient.publish('estufa/senai/comando_sliders', payload);
+        mqttClient.publish('estufa/senai/comando', payload);
       }
+
+      setTimeout(() => { usuarioInteragindo = false; }, 3000);
     }
 
     function toggleIrrigacao() {
