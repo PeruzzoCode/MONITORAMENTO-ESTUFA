@@ -10,6 +10,8 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- Biblioteca MQTT para conexão via WebSockets -->
+  <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
 
   <style>
     :root {
@@ -54,6 +56,14 @@
       color: var(--accent-green);
     }
 
+    .status-connection {
+      font-size: 0.85rem;
+      padding: 6px 12px;
+      border-radius: 20px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid var(--border-color);
+    }
+
     .dashboard-grid {
       display: grid;
       grid-template-columns: repeat(12, 1fr);
@@ -93,7 +103,6 @@
     .col-6 { grid-column: span 6; }
     .col-12 { grid-column: span 12; }
 
-    /* Estilos do Painel de Controle Interativo */
     .simulator-card {
       background-color: #1a2332;
       border: 1px solid var(--accent-blue);
@@ -101,41 +110,21 @@
     }
 
     .controls-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-      gap: 15px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
       margin-top: 10px;
     }
 
-    .control-group {
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-    }
-
-    .control-group label {
-      font-size: 0.85rem;
-      color: var(--text-muted);
-      display: flex;
-      justify-content: space-between;
-    }
-
-    input[type="range"] {
-      accent-color: var(--accent-blue);
-      cursor: pointer;
-    }
-
-    /* Botão de Toggle da Irrigação */
     .btn-toggle {
       background-color: var(--border-color);
       color: var(--text-main);
       border: none;
-      padding: 10px 15px;
+      padding: 10px 20px;
       border-radius: 8px;
       font-weight: 600;
       cursor: pointer;
       transition: all 0.2s ease;
-      margin-top: 5px;
     }
 
     .btn-toggle.active {
@@ -144,7 +133,6 @@
       box-shadow: 0 0 10px rgba(6, 182, 212, 0.5);
     }
 
-    /* Elementos visuais dos Cards */
     .badge-status {
       display: inline-block;
       padding: 4px 10px;
@@ -168,7 +156,7 @@
 
     .water-bar-fill {
       height: 100%;
-      width: 75%;
+      width: 0%;
       background: linear-gradient(90deg, #3b82f6, var(--accent-blue));
       transition: width 0.3s ease;
     }
@@ -182,50 +170,22 @@
 
   <header>
     <div class="logo-area">
-      <h1>🌱 Estufa de Monitoramento <span style="font-size: 0.8rem; color: var(--text-muted);">(Modo Interativo)</span></h1>
+      <h1>🌱 Estufa de Monitoramento <span style="font-size: 0.8rem; color: var(--text-muted);">(Conectado ao Wokwi)</span></h1>
     </div>
+    <div class="status-connection" id="mqtt-status">📡 Conectando ao Wokwi...</div>
   </header>
 
   <main class="dashboard-grid">
 
-    <!-- PAINEL INTERATIVO DE CONTROLE (MÁQUINA DE TESTES) -->
+    <!-- PAINEL DE COMANDO -->
     <div class="card col-12 simulator-card">
       <div class="card-header">
-        <span class="card-title" style="color: var(--accent-blue);">🎛️ Painel de Testes do Circuito (Interativo)</span>
-        <span style="font-size: 0.8rem; color: var(--text-muted);">Mova os controles para ver o dashboard mudar em tempo real</span>
+        <span class="card-title" style="color: var(--accent-blue);">🎛️ Controle da Irrigação em Tempo Real</span>
+        <span style="font-size: 0.8rem; color: var(--text-muted);">Envie comandos diretamente para o circuito no Wokwi</span>
       </div>
       <div class="controls-grid">
-        
-        <!-- Controle Temperatura -->
-        <div class="control-group">
-          <label>Temperatura (DHT22): <b id="lbl-temp">25 °C</b></label>
-          <input type="range" id="input-temp" min="0" max="50" value="25" step="0.5">
-        </div>
-
-        <!-- Controle Umidade -->
-        <div class="control-group">
-          <label>Umidade Ar (DHT22): <b id="lbl-umid">60 %</b></label>
-          <input type="range" id="input-umid" min="10" max="100" value="60">
-        </div>
-
-        <!-- Controle Luminosidade -->
-        <div class="control-group">
-          <label>Luminosidade (LDR): <b id="lbl-luz">80 %</b></label>
-          <input type="range" id="input-luz" min="0" max="100" value="80">
-        </div>
-
-        <!-- Controle Reservatório -->
-        <div class="control-group">
-          <label>Reservatório (Potenciômetro): <b id="lbl-agua">75 %</b></label>
-          <input type="range" id="input-agua" min="0" max="100" value="75">
-        </div>
-
-        <!-- Atuador Irrigação -->
-        <div class="control-group">
-          <label>Atuador Bomba (LED / Transistor):</label>
-          <button class="btn-toggle" id="btn-irrigacao" onclick="toggleIrrigacao()">LIGAR BOMBA</button>
-        </div>
-
+        <p>Acionamento manual da bomba/LED no Wokwi:</p>
+        <button class="btn-toggle" id="btn-irrigacao" onclick="toggleIrrigacao()">LIGAR BOMBA</button>
       </div>
     </div>
 
@@ -244,9 +204,9 @@
         <span class="card-title">Nível da Água</span>
         <span>🪣</span>
       </div>
-      <div class="card-value" id="nivel-agua-val">75%</div>
+      <div class="card-value" id="nivel-agua-val">--%</div>
       <div class="water-bar-bg">
-        <div class="water-bar-fill" id="water-bar" style="width: 75%;"></div>
+        <div class="water-bar-fill" id="water-bar" style="width: 0%;"></div>
       </div>
     </div>
 
@@ -255,7 +215,7 @@
         <span class="card-title">Temperatura</span>
         <span>🌡️</span>
       </div>
-      <div class="card-value" id="temp-val" style="color: var(--accent-yellow);">25.0 °C</div>
+      <div class="card-value" id="temp-val" style="color: var(--accent-yellow);">-- °C</div>
     </div>
 
     <div class="card col-3">
@@ -263,7 +223,7 @@
         <span class="card-title">Umidade do Ar</span>
         <span>💨</span>
       </div>
-      <div class="card-value" id="umid-val" style="color: var(--accent-blue);">60 %</div>
+      <div class="card-value" id="umid-val" style="color: var(--accent-blue);">-- %</div>
     </div>
 
     <!-- GRÁFICOS -->
@@ -284,15 +244,15 @@
   </main>
 
   <script>
-    // --- INICIALIZAÇÃO DOS GRÁFICOS ---
+    // GRÁFICOS INITIALIZATION
     const ctxTempUmid = document.getElementById('chartTempUmid').getContext('2d');
     const chartTempUmid = new Chart(ctxTempUmid, {
       type: 'line',
       data: {
-        labels: ['Agora'],
+        labels: [],
         datasets: [
-          { label: 'Temperatura (°C)', data: [25], borderColor: '#f59e0b', backgroundColor: 'rgba(245, 158, 11, 0.1)', tension: 0.3, fill: true },
-          { label: 'Umidade (%)', data: [60], borderColor: '#06b6d4', backgroundColor: 'rgba(6, 182, 212, 0.1)', tension: 0.3, fill: true }
+          { label: 'Temperatura (°C)', data: [], borderColor: '#f59e0b', backgroundColor: 'rgba(245, 158, 11, 0.1)', tension: 0.3, fill: true },
+          { label: 'Umidade (%)', data: [], borderColor: '#06b6d4', backgroundColor: 'rgba(6, 182, 212, 0.1)', tension: 0.3, fill: true }
         ]
       },
       options: {
@@ -309,8 +269,8 @@
     const chartLuminosidade = new Chart(ctxLuminosidade, {
       type: 'line',
       data: {
-        labels: ['Agora'],
-        datasets: [{ label: 'Luminosidade (%)', data: [80], borderColor: '#10b981', backgroundColor: 'rgba(16, 185, 129, 0.15)', tension: 0.3, fill: true }]
+        labels: [],
+        datasets: [{ label: 'Luminosidade (%)', data: [], borderColor: '#10b981', backgroundColor: 'rgba(16, 185, 129, 0.15)', tension: 0.3, fill: true }]
       },
       options: {
         responsive: true,
@@ -322,61 +282,42 @@
       }
     });
 
-    // --- CONTROLES E INTERATIVIDADE ---
-    let bombaLigada = false;
+    let bombaState = false;
 
-    // Elementos DOM
-    const inTemp = document.getElementById('input-temp');
-    const inUmid = document.getElementById('input-umid');
-    const inLuz = document.getElementById('input-luz');
-    const inAgua = document.getElementById('input-agua');
+    // CONEXÃO MQTT VIA WEBSOCKETS (HiveMQ Público)
+    const mqttClient = mqtt.connect('wss://broker.hivemq.com:8884/mqtt');
 
-    // Função de atualização
-    function atualizarPainel() {
-      const vTemp = parseFloat(inTemp.value).toFixed(1);
-      const vUmid = inUmid.value;
-      const vLuz = inLuz.value;
-      const vAgua = inAgua.value;
+    mqttClient.on('connect', () => {
+      document.getElementById('mqtt-status').innerText = '🟢 Conectado ao Wokwi';
+      document.getElementById('mqtt-status').style.color = 'var(--accent-green)';
+      mqttClient.subscribe('estufa/senai/dados');
+    });
 
-      // Atualiza textos do painel de controle
-      document.getElementById('lbl-temp').innerText = `${vTemp} °C`;
-      document.getElementById('lbl-umid').innerText = `${vUmid} %`;
-      document.getElementById('lbl-luz').innerText = `${vLuz} %`;
-      document.getElementById('lbl-agua').innerText = `${vAgua} %`;
+    mqttClient.on('offline', () => {
+      document.getElementById('mqtt-status').innerText = '🔴 Desconectado';
+      document.getElementById('mqtt-status').style.color = 'var(--accent-red)';
+    });
 
-      // Atualiza Cards
-      document.getElementById('temp-val').innerText = `${vTemp} °C`;
-      document.getElementById('umid-val').innerText = `${vUmid} %`;
-      document.getElementById('nivel-agua-val').innerText = `${vAgua}%`;
-      document.getElementById('water-bar').style.width = `${vAgua}%`;
-
-      // Adiciona novos pontos nos gráficos (limite de 10 dados por gráfico)
-      const horarioAtual = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-      
-      adicionarPontoGrafico(chartTempUmid, horarioAtual, [vTemp, vUmid]);
-      adicionarPontoGrafico(chartLuminosidade, horarioAtual, [vLuz]);
-    }
-
-    function adicionarPontoGrafico(chart, label, dados) {
-      if (chart.data.labels.length > 10) {
-        chart.data.labels.shift();
-        chart.data.datasets.forEach(dataset => dataset.data.shift());
+    mqttClient.on('message', (topic, message) => {
+      if (topic === 'estufa/senai/dados') {
+        const data = JSON.parse(message.toString());
+        atualizarDashboard(data);
       }
-      chart.data.labels.push(label);
-      chart.data.datasets.forEach((dataset, index) => {
-        dataset.data.push(dados[index]);
-      });
-      chart.update();
-    }
+    });
 
-    // Lógica do Botão da Irrigação (Atuador)
-    function toggleIrrigacao() {
-      bombaLigada = !bombaLigada;
+    function atualizarDashboard(data) {
+      document.getElementById('temp-val').innerText = `${data.temp.toFixed(1)} °C`;
+      document.getElementById('umid-val').innerText = `${data.umid.toFixed(0)} %`;
+      document.getElementById('nivel-agua-val').innerText = `${data.agua}%`;
+      document.getElementById('water-bar').style.width = `${data.agua}%`;
+
+      // Atualiza estado da bomba
+      bombaState = data.irrigando;
       const btn = document.getElementById('btn-irrigacao');
       const txt = document.getElementById('irrigacao-texto');
       const badge = document.getElementById('irrigacao-badge');
 
-      if (bombaLigada) {
+      if (bombaState) {
         btn.innerText = 'DESLIGAR BOMBA';
         btn.classList.add('active');
         txt.innerText = 'LIGADO';
@@ -391,16 +332,29 @@
         badge.innerText = 'Bomba Inativa';
         badge.className = 'badge-status badge-off';
       }
+
+      // Adiciona ponto nos gráficos
+      const hora = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      adicionarPontoGrafico(chartTempUmid, hora, [data.temp, data.umid]);
+      adicionarPontoGrafico(chartLuminosidade, hora, [data.luz]);
     }
 
-    // Eventos para escutar os sliders
-    inTemp.addEventListener('input', atualizarPainel);
-    inUmid.addEventListener('input', atualizarPainel);
-    inLuz.addEventListener('input', atualizarPainel);
-    inAgua.addEventListener('input', atualizarPainel);
+    function adicionarPontoGrafico(chart, label, dados) {
+      if (chart.data.labels.length > 10) {
+        chart.data.labels.shift();
+        chart.data.datasets.forEach(dataset => dataset.data.shift());
+      }
+      chart.data.labels.push(label);
+      chart.data.datasets.forEach((dataset, index) => {
+        dataset.data.push(dados[index]);
+      });
+      chart.update();
+    }
 
-    // Registra o primeiro ponto ao carregar
-    atualizarPainel();
+    function toggleIrrigacao() {
+      const novoComando = bombaState ? 'DESLIGAR_BOMBA' : 'LIGAR_BOMBA';
+      mqttClient.publish('estufa/senai/comando', novoComando);
+    }
   </script>
 </body>
 </html>
