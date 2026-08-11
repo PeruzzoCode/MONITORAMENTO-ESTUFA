@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Dashboard Interativo - Mini Estufa ESP32</title>
+  <title>Central de Controle Estufa IoT</title>
   
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -21,6 +21,7 @@
       --accent-green: #10b981;
       --accent-blue: #06b6d4;
       --accent-yellow: #f59e0b;
+      --accent-purple: #8b5cf6;
       --accent-red: #ef4444;
       --border-color: #334155;
     }
@@ -28,6 +29,40 @@
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', sans-serif; }
     body { background-color: var(--bg-primary); color: var(--text-main); min-height: 100vh; padding: 20px; }
 
+    /* GERENCIAMENTO DE TELAS */
+    .screen { display: none; }
+    .screen.active { display: block; }
+
+    /* TELA DE SELEÇÃO INICIAL */
+    .selection-container {
+      max-width: 800px;
+      margin: 80px auto;
+      text-align: center;
+    }
+    .selection-container h1 { font-size: 2.2rem; color: var(--accent-green); margin-bottom: 10px; }
+    .selection-container p { color: var(--text-muted); margin-bottom: 40px; }
+    
+    .cards-choice { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
+    
+    .card-option {
+      background: var(--bg-card);
+      border: 2px solid var(--border-color);
+      border-radius: 16px;
+      padding: 30px 20px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      text-align: center;
+    }
+    .card-option:hover {
+      border-color: var(--accent-blue);
+      transform: translateY(-5px);
+      box-shadow: 0 10px 25px rgba(6, 182, 212, 0.2);
+    }
+    .card-option .icon { font-size: 3rem; margin-bottom: 15px; }
+    .card-option h2 { font-size: 1.4rem; margin-bottom: 10px; color: var(--text-main); }
+    .card-option p { font-size: 0.9rem; color: var(--text-muted); line-height: 1.4; }
+
+    /* LAYOUT DOS DASHBOARDS */
     header {
       display: flex;
       justify-content: space-between;
@@ -38,7 +73,18 @@
       border-bottom: 1px solid var(--border-color);
     }
 
-    .logo-area h1 { font-size: 1.4rem; font-weight: 700; color: var(--accent-green); }
+    .btn-back {
+      background: var(--border-color);
+      color: var(--text-main);
+      border: none;
+      padding: 8px 16px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 600;
+      transition: 0.2s;
+    }
+    .btn-back:hover { background: #475569; }
+
     .status-connection { font-size: 0.85rem; padding: 6px 12px; border-radius: 20px; background: rgba(255,255,255,0.05); border: 1px solid var(--border-color); font-weight: 600; }
 
     .dashboard-grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 20px; max-width: 1200px; margin: 0 auto; }
@@ -58,246 +104,265 @@
     input[type="range"] { accent-color: var(--accent-blue); cursor: pointer; }
 
     .btn-toggle {
-      background-color: var(--border-color); color: var(--text-main); border: none; padding: 10px 15px;
-      border-radius: 8px; font-weight: 600; cursor: pointer; transition: all 0.2s ease; margin-top: 5px;
+      background-color: var(--border-color); color: var(--text-main); border: none; padding: 12px 20px;
+      border-radius: 8px; font-weight: 700; cursor: pointer; transition: all 0.2s ease; margin-top: 5px;
+      font-size: 0.9rem; width: 100%;
     }
-    .btn-toggle.active { background-color: var(--accent-blue); color: #000; box-shadow: 0 0 10px rgba(6, 182, 212, 0.5); }
+    .btn-toggle.active { background-color: var(--accent-blue); color: #000; box-shadow: 0 0 12px rgba(6, 182, 212, 0.6); }
 
     .badge-status { display: inline-block; padding: 4px 10px; border-radius: 6px; font-size: 0.8rem; font-weight: 700; margin-top: 10px; }
     .badge-off { background-color: rgba(148, 163, 184, 0.2); color: var(--text-muted); }
     .badge-on { background-color: rgba(6, 182, 212, 0.2); color: var(--accent-blue); }
 
     .water-bar-bg { width: 100%; height: 10px; background-color: var(--bg-primary); border-radius: 6px; overflow: hidden; margin-top: 15px; }
-    .water-bar-fill { height: 100%; width: 50%; background: linear-gradient(90deg, #3b82f6, var(--accent-blue)); transition: width 0.3s ease; }
+    .water-bar-fill { height: 100%; width: 0%; background: linear-gradient(90deg, #3b82f6, var(--accent-blue)); transition: width 0.3s ease; }
 
     @media (max-width: 900px) { .col-3, .col-6 { grid-column: span 12; } }
   </style>
 </head>
 <body>
 
-  <header>
-    <div class="logo-area">
-      <h1>🌱 Estufa de Monitoramento <span style="font-size: 0.8rem; color: var(--text-muted);">(Modo Interativo Wokwi)</span></h1>
-    </div>
-    <div class="status-connection" id="mqtt-status">📡 Conectando ao Wokwi...</div>
-  </header>
+  <!-- ========================================== -->
+  <!-- TELA 1: SELEÇÃO DE MODO                    -->
+  <!-- ========================================== -->
+  <div id="screen-menu" class="screen active">
+    <div class="selection-container">
+      <h1>🌱 Sistema de Monitoramento Estufa IoT</h1>
+      <p>Selecione o modo de operação desejado para acessar a interface correspondente</p>
 
-  <main class="dashboard-grid">
-
-    <!-- PAINEL INTERATIVO DE CONTROLE -->
-    <div class="card col-12 simulator-card">
-      <div class="card-header">
-        <span class="card-title" style="color: var(--accent-blue);">🎛️ Painel de Controle Remoto / Sobrescrita</span>
-        <span style="font-size: 0.8rem; color: var(--text-muted);">Mova os controles abaixo para simular/sobrescrever leituras no Wokwi</span>
-      </div>
-      <div class="controls-grid">
-        
-        <div class="control-group">
-          <label>Temperatura: <b id="lbl-temp">25.0 °C</b></label>
-          <input type="range" id="input-temp" min="0" max="50" value="25" step="0.5" oninput="enviarComandosWeb()">
+      <div class="cards-choice">
+        <div class="card-option" onclick="abrirModo('wokwi')">
+          <div class="icon">🖥️</div>
+          <h2>Modo Wokwi (Simulador)</h2>
+          <p>Controle manual completo de todos os parâmetros virtuais (Temperatura, Umidade, Luz e Bomba).</p>
         </div>
 
-        <div class="control-group">
-          <label>Umidade Ar: <b id="lbl-umid">60 %</b></label>
-          <input type="range" id="input-umid" min="10" max="100" value="60" oninput="enviarComandosWeb()">
+        <div class="card-option" onclick="abrirModo('fisico')">
+          <div class="icon">⚡</div>
+          <h2>Modo ESP32-S3 (Físico)</h2>
+          <p>Leitura dos sensores físicos reais da placa. Permite controlar apenas o reservatório e a irrigação.</p>
         </div>
+      </div>
+    </div>
+  </div>
 
-        <div class="control-group">
-          <label>Luminosidade (LDR): <b id="lbl-luz">80 %</b></label>
-          <input type="range" id="input-luz" min="0" max="100" value="80" oninput="enviarComandosWeb()">
+  <!-- ========================================== -->
+  <!-- TELA 2: DASHBOARD (PADRÃO REAPROVEITADO)   -->
+  <!-- ========================================== -->
+  <div id="screen-dashboard" class="screen">
+    <header>
+      <div style="display: flex; align-items: center; gap: 15px;">
+        <button class="btn-back" onclick="voltarMenu()">⬅️ Trocar Modo</button>
+        <h1 id="dash-title">🌱 Estufa IoT</h1>
+      </div>
+      <div class="status-connection" id="mqtt-status">📡 Conectando ao Broker...</div>
+    </header>
+
+    <main class="dashboard-grid">
+
+      <!-- PAINEL DE CONTROLE / SLIDERS -->
+      <div class="card col-12 simulator-card">
+        <div class="card-header">
+          <span class="card-title" id="control-panel-title" style="color: var(--accent-blue);">🎛️ Painel de Atuação</span>
+          <span id="control-panel-subtitle" style="font-size: 0.8rem; color: var(--text-muted);">--</span>
         </div>
-
-        <div class="control-group">
-          <label>Reservatório (Solo): <b id="lbl-agua">56 %</b></label>
-          <input type="range" id="input-agua" min="0" max="100" value="56" oninput="enviarComandosWeb()">
+        <div class="controls-grid" id="controls-container">
+          <!-- Gerado dinamicamente via JS -->
         </div>
-
-        <div class="control-group">
-          <label>Atuador Bomba (LED):</label>
-          <button class="btn-toggle" id="btn-irrigacao" onclick="toggleIrrigacao()">LIGAR BOMBA</button>
-        </div>
-
       </div>
-    </div>
 
-    <!-- CARDS DE MONITORAMENTO -->
-    <div class="card col-3">
-      <div class="card-header">
-        <span class="card-title">Irrigação</span>
-        <span>💧</span>
+      <!-- CARDS DE MÉTRICAS -->
+      <div class="card col-3">
+        <div class="card-header"><span class="card-title">Irrigação</span><span>💧</span></div>
+        <div class="card-value" id="irrigacao-texto">DESLIGADO</div>
+        <div id="irrigacao-badge" class="badge-status badge-off">Bomba Inativa</div>
       </div>
-      <div class="card-value" id="irrigacao-texto">DESLIGADO</div>
-      <div id="irrigacao-badge" class="badge-status badge-off">Bomba Inativa</div>
-    </div>
 
-    <div class="card col-3">
-      <div class="card-header">
-        <span class="card-title">Nível da Água</span>
-        <span>🪣</span>
+      <div class="card col-3">
+        <div class="card-header"><span class="card-title">Nível da Água</span><span>🪣</span></div>
+        <div class="card-value" id="nivel-agua-val">0%</div>
+        <div class="water-bar-bg"><div class="water-bar-fill" id="water-bar" style="width: 0%;"></div></div>
       </div>
-      <div class="card-value" id="nivel-agua-val">56%</div>
-      <div class="water-bar-bg">
-        <div class="water-bar-fill" id="water-bar" style="width: 56%;"></div>
+
+      <div class="card col-3">
+        <div class="card-header"><span class="card-title">Temperatura</span><span>🌡️</span></div>
+        <div class="card-value" id="temp-val" style="color: var(--accent-yellow);">-- °C</div>
       </div>
-    </div>
 
-    <div class="card col-3">
-      <div class="card-header">
-        <span class="card-title">Temperatura</span>
-        <span>🌡️</span>
+      <div class="card col-3">
+        <div class="card-header"><span class="card-title">Umidade do Ar</span><span>💨</span></div>
+        <div class="card-value" id="umid-val" style="color: var(--accent-blue);">-- %</div>
       </div>
-      <div class="card-value" id="temp-val" style="color: var(--accent-yellow);">25.0 °C</div>
-    </div>
 
-    <div class="card col-3">
-      <div class="card-header">
-        <span class="card-title">Umidade do Ar</span>
-        <span>💨</span>
+      <!-- GRÁFICOS -->
+      <div class="card col-6">
+        <div class="card-header"><span class="card-title">Gráfico de Temperatura e Umidade</span></div>
+        <canvas id="chartTempUmid"></canvas>
       </div>
-      <div class="card-value" id="umid-val" style="color: var(--accent-blue);">60 %</div>
-    </div>
 
-    <!-- GRÁFICOS -->
-    <div class="card col-6">
-      <div class="card-header"><span class="card-title">Gráfico de Temperatura e Umidade</span></div>
-      <canvas id="chartTempUmid"></canvas>
-    </div>
+      <div class="card col-6">
+        <div class="card-header"><span class="card-title">Histórico de Luminosidade (LDR)</span></div>
+        <canvas id="chartLuminosidade"></canvas>
+      </div>
 
-    <div class="card col-6">
-      <div class="card-header"><span class="card-title">Histórico de Luminosidade (LDR)</span></div>
-      <canvas id="chartLuminosidade"></canvas>
-    </div>
-
-  </main>
+    </main>
+  </div>
 
   <script>
-    const ctxTempUmid = document.getElementById('chartTempUmid').getContext('2d');
-    const chartTempUmid = new Chart(ctxTempUmid, {
-      type: 'line',
-      data: {
-        labels: [],
-        datasets: [
-          { label: 'Temperatura (°C)', data: [], borderColor: '#f59e0b', backgroundColor: 'rgba(245, 158, 11, 0.1)', tension: 0.3, fill: true },
-          { label: 'Umidade (%)', data: [], borderColor: '#06b6d4', backgroundColor: 'rgba(6, 182, 212, 0.1)', tension: 0.3, fill: true }
-        ]
-      },
-      options: {
-        responsive: true,
-        plugins: { legend: { labels: { color: '#f8fafc' } } },
-        scales: {
-          x: { ticks: { color: '#94a3b8' }, grid: { color: '#334155' } },
-          y: { ticks: { color: '#94a3b8' }, grid: { color: '#334155' } }
-        }
-      }
-    });
-
-    const ctxLuminosidade = document.getElementById('chartLuminosidade').getContext('2d');
-    const chartLuminosidade = new Chart(ctxLuminosidade, {
-      type: 'line',
-      data: {
-        labels: [],
-        datasets: [{ label: 'Luminosidade (%)', data: [], borderColor: '#10b981', backgroundColor: 'rgba(16, 185, 129, 0.15)', tension: 0.3, fill: true }]
-      },
-      options: {
-        responsive: true,
-        plugins: { legend: { labels: { color: '#f8fafc' } } },
-        scales: {
-          x: { ticks: { color: '#94a3b8' }, grid: { color: '#334155' } },
-          y: { ticks: { color: '#94a3b8' }, grid: { color: '#334155' } }
-        }
-      }
-    });
-
+    let modoAtual = 'wokwi'; // 'wokwi' ou 'fisico'
     let bombaLigada = false;
-    let usuarioInteragindo = false;
+    let tempoUltimaInteracao = 0;
+    let timerDebounce = null;
+    let chartTempUmid = null;
+    let chartLuminosidade = null;
 
+    // Conexão MQTT Única
     const mqttClient = mqtt.connect('wss://broker.hivemq.com:8884/mqtt', {
-      clientId: 'web_estufa_' + Math.random().toString(16).substr(2, 8)
+      clientId: 'web_estufa_hub_' + Math.random().toString(16).substr(2, 8)
     });
 
     mqttClient.on('connect', () => {
-      document.getElementById('mqtt-status').innerText = '🟢 Conectado ao Wokwi';
+      document.getElementById('mqtt-status').innerText = '🟢 Broker Conectado';
       document.getElementById('mqtt-status').style.color = 'var(--accent-green)';
       mqttClient.subscribe('estufa/senai/dados');
     });
 
     mqttClient.on('offline', () => {
-      document.getElementById('mqtt-status').innerText = '🔴 Desconectado';
+      document.getElementById('mqtt-status').innerText = '🔴 Dispositivo Desconectado';
       document.getElementById('mqtt-status').style.color = 'var(--accent-red)';
     });
 
     mqttClient.on('message', (topic, message) => {
       if (topic === 'estufa/senai/dados') {
         const data = JSON.parse(message.toString());
-        
-        // Atualizar se o usuário não estiver mexendo nos sliders no exato segundo
-        if (!usuarioInteragindo) {
-          atualizarValoresTela(data.temp, data.umid, data.luz, data.agua, data.bomba);
-        }
+        processarDadosRecebidos(data);
       }
     });
 
-    function atualizarValoresTela(temp, umid, luz, agua, bomba) {
-      document.getElementById('temp-val').innerText = `${parseFloat(temp).toFixed(1)} °C`;
-      document.getElementById('umid-val').innerText = `${umid} %`;
-      document.getElementById('nivel-agua-val').innerText = `${agua}%`;
-      document.getElementById('water-bar').style.width = `${agua}%`;
+    function inicializarGraficos() {
+      if (chartTempUmid) chartTempUmid.destroy();
+      if (chartLuminosidade) chartLuminosidade.destroy();
 
-      document.getElementById('lbl-temp').innerText = `${parseFloat(temp).toFixed(1)} °C`;
-      document.getElementById('lbl-umid').innerText = `${umid} %`;
-      document.getElementById('lbl-luz').innerText = `${luz} %`;
-      document.getElementById('lbl-agua').innerText = `${agua} %`;
-
-      document.getElementById('input-temp').value = temp;
-      document.getElementById('input-umid').value = umid;
-      document.getElementById('input-luz').value = luz;
-      document.getElementById('input-agua').value = agua;
-
-      const hora = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-      adicionarPontoGrafico(chartTempUmid, hora, [temp, umid]);
-      adicionarPontoGrafico(chartLuminosidade, hora, [luz]);
-    }
-
-    function enviarComandosWeb() {
-      usuarioInteragindo = true;
-      
-      const vTemp = parseFloat(document.getElementById('input-temp').value).toFixed(1);
-      const vUmid = parseInt(document.getElementById('input-umid').value);
-      const vLuz = parseInt(document.getElementById('input-luz').value);
-      const vAgua = parseInt(document.getElementById('input-agua').value);
-
-      document.getElementById('lbl-temp').innerText = `${vTemp} °C`;
-      document.getElementById('lbl-umid').innerText = `${vUmid} %`;
-      document.getElementById('lbl-luz').innerText = `${vLuz} %`;
-      document.getElementById('lbl-agua').innerText = `${vAgua} %`;
-
-      document.getElementById('temp-val').innerText = `${vTemp} °C`;
-      document.getElementById('umid-val').innerText = `${vUmid} %`;
-      document.getElementById('nivel-agua-val').innerText = `${vAgua}%`;
-      document.getElementById('water-bar').style.width = `${vAgua}%`;
-
-      const payload = JSON.stringify({
-        temp: parseFloat(vTemp),
-        umid: vUmid,
-        luz: vLuz,
-        agua: vAgua,
-        bomba: bombaLigada
+      const ctxTempUmid = document.getElementById('chartTempUmid').getContext('2d');
+      chartTempUmid = new Chart(ctxTempUmid, {
+        type: 'line',
+        data: {
+          labels: [],
+          datasets: [
+            { label: 'Temperatura (°C)', data: [], borderColor: '#f59e0b', backgroundColor: 'rgba(245, 158, 11, 0.1)', tension: 0.3, fill: true },
+            { label: 'Umidade (%)', data: [], borderColor: '#06b6d4', backgroundColor: 'rgba(6, 182, 212, 0.1)', tension: 0.3, fill: true }
+          ]
+        },
+        options: { responsive: true, plugins: { legend: { labels: { color: '#f8fafc' } } }, scales: { x: { ticks: { color: '#94a3b8' }, grid: { color: '#334155' } }, y: { ticks: { color: '#94a3b8' }, grid: { color: '#334155' } } } }
       });
 
-      if (mqttClient.connected) {
-        mqttClient.publish('estufa/senai/comando', payload);
-      }
-
-      setTimeout(() => { usuarioInteragindo = false; }, 3000);
+      const ctxLuminosidade = document.getElementById('chartLuminosidade').getContext('2d');
+      chartLuminosidade = new Chart(ctxLuminosidade, {
+        type: 'line',
+        data: {
+          labels: [],
+          datasets: [{ label: 'Luminosidade (%)', data: [], borderColor: '#10b981', backgroundColor: 'rgba(16, 185, 129, 0.15)', tension: 0.3, fill: true }]
+        },
+        options: { responsive: true, plugins: { legend: { labels: { color: '#f8fafc' } } }, scales: { x: { ticks: { color: '#94a3b8' }, grid: { color: '#334155' } }, y: { ticks: { color: '#94a3b8' }, grid: { color: '#334155' } } } }
+      });
     }
 
-    function toggleIrrigacao() {
-      bombaLigada = !bombaLigada;
+    function abrirModo(modo) {
+      modoAtual = modo;
+      document.getElementById('screen-menu').classList.remove('active');
+      document.getElementById('screen-dashboard').classList.add('active');
+
+      const title = document.getElementById('dash-title');
+      const sub = document.getElementById('control-panel-subtitle');
+      const container = document.getElementById('controls-container');
+
+      if (modo === 'wokwi') {
+        title.innerText = '🖥️ Estufa IoT - Modo Wokwi (Simulador)';
+        sub.innerText = 'Controle total dos sensores virtuais e atuadores';
+        container.innerHTML = `
+          <div class="control-group">
+            <label>Temperatura: <b id="lbl-temp">25.0 °C</b></label>
+            <input type="range" id="input-temp" min="0" max="50" value="25" step="0.5" oninput="enviarComandosWeb()">
+          </div>
+          <div class="control-group">
+            <label>Umidade Ar: <b id="lbl-umid">50 %</b></label>
+            <input type="range" id="input-umid" min="10" max="100" value="50" oninput="enviarComandosWeb()">
+          </div>
+          <div class="control-group">
+            <label>Luminosidade (LDR): <b id="lbl-luz">50 %</b></label>
+            <input type="range" id="input-luz" min="0" max="100" value="50" oninput="enviarComandosWeb()">
+          </div>
+          <div class="control-group">
+            <label>Reservatório (Solo): <b id="lbl-agua">50 %</b></label>
+            <input type="range" id="input-agua" min="0" max="100" value="50" oninput="enviarComandosWeb()">
+          </div>
+          <div class="control-group">
+            <label>Acionar Bomba:</label>
+            <button class="btn-toggle" id="btn-irrigacao" onclick="toggleIrrigacao()">LIGAR BOMBA</button>
+          </div>
+        `;
+      } else {
+        title.innerText = '⚡ Estufa IoT - Modo ESP32-S3 Física';
+        sub.innerText = 'Lendo sensores reais. Altere apenas o reservatório e a bomba.';
+        container.innerHTML = `
+          <div class="control-group">
+            <label>Nível do Reservatório / Solo: <b id="lbl-agua">50 %</b></label>
+            <input type="range" id="input-agua" min="0" max="100" value="50" oninput="enviarComandosWeb()">
+          </div>
+          <div class="control-group">
+            <label>Acionar Bomba de Irrigação:</label>
+            <button class="btn-toggle" id="btn-irrigacao" onclick="toggleIrrigacao()">LIGAR BOMBA</button>
+          </div>
+        `;
+      }
+
+      inicializarGraficos();
+    }
+
+    function voltarMenu() {
+      document.getElementById('screen-dashboard').classList.remove('active');
+      document.getElementById('screen-menu').classList.add('active');
+    }
+
+    function processarDadosRecebidos(data) {
+      document.getElementById('temp-val').innerText = `${parseFloat(data.temp).toFixed(1)} °C`;
+      document.getElementById('umid-val').innerText = `${data.umid} %`;
+
+      if (Date.now() - tempoUltimaInteracao > 5000) {
+        document.getElementById('nivel-agua-val').innerText = `${data.agua}%`;
+        document.getElementById('water-bar').style.width = `${data.agua}%`;
+
+        if (document.getElementById('lbl-agua')) document.getElementById('lbl-agua').innerText = `${data.agua} %`;
+        if (document.getElementById('input-agua')) document.getElementById('input-agua').value = data.agua;
+
+        if (modoAtual === 'wokwi') {
+          if (document.getElementById('lbl-temp')) document.getElementById('lbl-temp').innerText = `${data.temp} °C`;
+          if (document.getElementById('input-temp')) document.getElementById('input-temp').value = data.temp;
+
+          if (document.getElementById('lbl-umid')) document.getElementById('lbl-umid').innerText = `${data.umid} %`;
+          if (document.getElementById('input-umid')) document.getElementById('input-umid').value = data.umid;
+
+          if (document.getElementById('lbl-luz')) document.getElementById('lbl-luz').innerText = `${data.luz} %`;
+          if (document.getElementById('input-luz')) document.getElementById('input-luz').value = data.luz;
+        }
+
+        bombaLigada = data.bomba;
+        atualizarStatusBombaUI(bombaLigada);
+      }
+
+      const hora = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      adicionarPontoGrafico(chartTempUmid, hora, [data.temp, data.umid]);
+      adicionarPontoGrafico(chartLuminosidade, hora, [data.luz]);
+    }
+
+    function atualizarStatusBombaUI(estado) {
       const btn = document.getElementById('btn-irrigacao');
       const txt = document.getElementById('irrigacao-texto');
       const badge = document.getElementById('irrigacao-badge');
 
-      if (bombaLigada) {
+      if (!btn) return;
+
+      if (estado) {
         btn.innerText = 'DESLIGAR BOMBA';
         btn.classList.add('active');
         txt.innerText = 'LIGADO';
@@ -312,12 +377,58 @@
         badge.innerText = 'Bomba Inativa';
         badge.className = 'badge-status badge-off';
       }
+    }
 
+    function enviarComandosWeb() {
+      tempoUltimaInteracao = Date.now();
+      
+      let payloadObj = { bomba: bombaLigada };
+
+      const inAgua = document.getElementById('input-agua');
+      if (inAgua) {
+        const vAgua = parseInt(inAgua.value);
+        document.getElementById('lbl-agua').innerText = `${vAgua} %`;
+        document.getElementById('nivel-agua-val').innerText = `${vAgua}%`;
+        document.getElementById('water-bar').style.width = `${vAgua}%`;
+        payloadObj.agua = vAgua;
+      }
+
+      if (modoAtual === 'wokwi') {
+        const inTemp = document.getElementById('input-temp');
+        const inUmid = document.getElementById('input-umid');
+        const inLuz  = document.getElementById('input-luz');
+
+        if (inTemp) {
+          payloadObj.temp = parseFloat(inTemp.value);
+          document.getElementById('lbl-temp').innerText = `${payloadObj.temp} °C`;
+        }
+        if (inUmid) {
+          payloadObj.umid = parseInt(inUmid.value);
+          document.getElementById('lbl-umid').innerText = `${payloadObj.umid} %`;
+        }
+        if (inLuz) {
+          payloadObj.luz = parseInt(inLuz.value);
+          document.getElementById('lbl-luz').innerText = `${payloadObj.luz} %`;
+        }
+      }
+
+      clearTimeout(timerDebounce);
+      timerDebounce = setTimeout(() => {
+        if (mqttClient.connected) {
+          mqttClient.publish('estufa/senai/comando', JSON.stringify(payloadObj));
+        }
+      }, 200);
+    }
+
+    function toggleIrrigacao() {
+      bombaLigada = !bombaLigada;
+      atualizarStatusBombaUI(bombaLigada);
       enviarComandosWeb();
     }
 
     function adicionarPontoGrafico(chart, label, dados) {
-      if (chart.data.labels.length > 10) {
+      if (!chart) return;
+      if (chart.data.labels.length > 12) {
         chart.data.labels.shift();
         chart.data.datasets.forEach(dataset => dataset.data.shift());
       }

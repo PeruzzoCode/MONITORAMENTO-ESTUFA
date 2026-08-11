@@ -10,12 +10,12 @@
 // ==========================================
 // DEFINIÇÃO DE PINOS - ESP32-S3
 // ==========================================
-#define DHT_PIN          4   // Sensor DHT22
-#define DHTTYPE          DHT22
-#define LDR_PIN          5   // Sensor de Luz (ADC)
-#define POT_PIN          6   // Potenciômetro Nível de Água (ADC)
-#define LED_IRRIGA_PIN   7   // LED/Relé Irrigação
-#define BUZZER_PIN       15  // Buzzer de Alerta
+#define DHT_PIN          6   // Sensor DHT11
+#define DHTTYPE          DHT11
+#define LDR_PIN          7   // Sensor de Luz (ADC)
+#define POT_PIN          4   // Potenciômetro Nível de Água (ADC)
+#define LED_IRRIGA_PIN   10   // LED/Relé Irrigação
+#define BUZZER_PIN       5  // Buzzer de Alerta
 #define SDA_PIN          8   // Display LCD I2C SDA
 #define SCL_PIN          9   // Display LCD I2C SCL
 
